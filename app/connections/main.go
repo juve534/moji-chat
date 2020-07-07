@@ -35,6 +35,7 @@ func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 	if err != nil {
 		return events.APIGatewayProxyResponse{}, err
 	}
+    var_dump(resp.Body)
 
 	if len(ip) == 0 {
 		return events.APIGatewayProxyResponse{}, ErrNoIP
@@ -48,4 +49,10 @@ func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 
 func main() {
 	lambda.Start(handler)
+}
+
+func var_dump(v ...interface{}) {
+    for _, vv := range(v) {
+        fmt.Printf("%#v\n", vv)
+    }
 }
