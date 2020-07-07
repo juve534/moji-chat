@@ -11,33 +11,110 @@ Globals:
     Timeout: 5
 
 Resources:
-  HelloWorldFunction:
+  # websocket
+  SimpleChatWebSocket:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: SimpleChatWebSocket
+      ProtocolType: WEBSOCKET
+      RouteSelectionExpression: "$request.body.action"
+  ConnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref SimpleChatWebSocket
+      RouteKey: $connect
+      AuthorizationType: NONE
+      OperationName: ConnectRoute
+      Target: !Join
+        - '/'
+        - - 'integrations'
+          - !Ref ConnectInteg
+  ConnectInteg:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref SimpleChatWebSocket
+      Description: Connect Integration
+      IntegrationType: AWS_PROXY
+      IntegrationUri:
+        Fn::Sub:
+          arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OnConnectFunction.Arn}/invocations
+
+  Deployment:
+    Type: AWS::ApiGatewayV2::Deployment
+    DependsOn:
+    - ConnectRoute
+    Properties:
+      ApiId: !Ref SimpleChatWebSocket
+  Stage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      StageName: dev
+      Description: dev Stage
+      DeploymentId: !Ref Deployment
+      ApiId: !Ref SimpleChatWebSocket
+  OnConnectFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
     Properties:
-      CodeUri: hello-world/
-      Handler: hello-world
+      CodeUri: connections/
+      Handler: connections
       Runtime: go1.x
+#      Role: !GetAtt SimpleChatWebSocketIamRole.Arn
       Tracing: Active # https://docs.aws.amazon.com/lambda/latest/dg/lambda-x-ray.html
-      Events:
-        CatchAll:
-          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
-          Properties:
-            Path: /hello
-            Method: GET
       Environment: # More info about Env Vars: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#environment-object
         Variables:
           PARAM1: VALUE
+  OnConnectPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - SimpleChatWebSocket
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref OnConnectFunction
+      Principal: apigateway.amazonaws.com
+#
+#  SimpleChatWebSocketIamRole:
+#    Type: AWS::IAM::Role
+#    Properties:
+#      AssumeRolePolicyDocument:
+#        Version: "2012-10-17"
+#        Statement:
+#          - Effect: Allow
+#            Principal:
+#              Service: apigateway.amazonaws.com
+#            Action: "sts:AssumeRole"
+#      Policies:
+#        - PolicyName: "control_ec2_ecs_function_policy"
+#          PolicyDocument:
+#            Version: "2012-10-17"
+#            Statement:
+#              - Effect: "Allow"
+#                Action: "lambda:InvokeFunction"
+#                Resource: "*"
+#              - Effect: "Allow"
+#                Action: "logs:CreateLogGroup"
+#                Resource: "arn:aws:logs:*:*:*"
+#              - Effect: "Allow"
+#                Action: "logs:CreateLogStream"
+#                Resource: "arn:aws:logs:*:*:*"
+#              - Effect: "Allow"
+#                Action: "logs:PutLogEvents"
+#                Resource: "arn:aws:logs:*:*:*"
+#              - Effect: "Allow"
+#                Action:
+#                  - ec2:CreateNetworkInterface
+#                  - ec2:DeleteNetworkInterface
+#                  - ec2:DescribeNetworkInterfaces
+#                  - ec2:DetachNetworkInterface
+#                  - ec2:DescribeSecurityGroups
+#                  - ec2:DescribeSubnets
+#                  - ec2:DescribeVpcs
+#                Resource: "*"
 
 Outputs:
-  # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
-  # Find out more about other implicit resources you can reference within SAM
-  # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
-  HelloWorldAPI:
-    Description: "API Gateway endpoint URL for Prod environment for First Function"
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/hello/"
-  HelloWorldFunction:
-    Description: "First Lambda Function ARN"
-    Value: !GetAtt HelloWorldFunction.Arn
-  HelloWorldFunctionIamRole:
-    Description: "Implicit IAM Role created for Hello World function"
-    Value: !GetAtt HelloWorldFunctionRole.Arn
+  OnConnectFunctionArn:
+    Description: "OnConnect function ARN"
+    Value: !GetAtt OnConnectFunction.Arn
+
+  WebSocketURI:
+    Description: "The WSS Protocol URI to connect to"
+    Value: !Join [ '', [ 'wss://', !Ref SimpleChatWebSocket, '.execute-api.',!Ref 'AWS::Region','.amazonaws.com/',!Ref 'Stage'] ]
