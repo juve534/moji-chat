@@ -1,0 +1,120 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Parameters:
+  # SSHを許可するIP
+  MyIP:
+    Description: My IP
+    Type:  String
+
+Resources:
+  MojiChatVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      Tags:
+      - Key: Name
+        Value: MojiChatVPC
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+      - Key: Name
+        Value: MojiChatVPC-IGW
+
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref MojiChatVPC
+      InternetGatewayId: !Ref InternetGateway
+
+  FrontendRouteTable:
+    Type: AWS::EC2::RouteTable
+    DependsOn: AttachGateway
+    Properties:
+      VpcId: !Ref MojiChatVPC
+      Tags:
+      - Key: Name
+        Value: MojiChatVPC-FrontendRoute
+
+  FrontendRoute:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref FrontendRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  FrontendSubnet:
+    Type: AWS::EC2::Subnet
+    DependsOn: AttachGateway
+    Properties:
+      CidrBlock: 10.0.1.0/24
+      MapPublicIpOnLaunch: 'true'
+      VpcId: !Ref MojiChatVPC
+      Tags:
+      - Key: Name
+        Value: MojiChatVPC-FrontendSubnet
+      - Key: Network
+        Value: public
+
+  FrontendSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref FrontendSubnet
+      RouteTableId: !Ref FrontendRouteTable
+  
+  SubnetPrivate:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: 10.0.2.0/24
+      AvailabilityZone: ap-northeast-1a
+      VpcId: !Ref MojiChatVPC
+      Tags:
+        - Key: Network
+          Value: private
+        - Key: Name
+          Value: MojiChatVPC-SubnetPrivate
+
+  MojiChatSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: MojiChatSG
+      VpcId: !Ref MojiChatVPC
+      Tags:
+        - Key: 'Name'
+          Value: 'MojiChatSG'
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '22'
+        ToPort: '22'
+        CidrIp: !Ref MyIP
+  
+  CacheSubnetGroup:
+    Type: AWS::ElastiCache::SubnetGroup
+    Properties:
+      CacheSubnetGroupName: cache-private
+      Description: cache-private-sg
+      SubnetIds:
+        - !Ref SubnetPrivate
+
+  Cache:
+    Type: AWS::ElastiCache::ReplicationGroup
+    Properties:
+      AtRestEncryptionEnabled: false
+      CacheNodeType: cache.t2.micro
+      CacheSubnetGroupName: !Ref CacheSubnetGroup
+      Engine: redis
+      EngineVersion: 5.0.6
+      NumCacheClusters: 2
+      PreferredMaintenanceWindow: "tue:08:00-tue:09:00"
+      ReplicationGroupId: moji-chat-cache
+      ReplicationGroupDescription: Prod
+      SecurityGroupIds:
+        - sg-084199ab9beac7266
+
+Outputs:
+  CacheAddr:
+    Value: !GetAtt Cache.PrimaryEndPoint.Address
+    Export:
+      Name: MojiChatCacheAddr
