@@ -89,3 +89,32 @@ Resources:
         FromPort: '22'
         ToPort: '22'
         CidrIp: !Ref MyIP
+  
+  CacheSubnetGroup:
+    Type: AWS::ElastiCache::SubnetGroup
+    Properties:
+      CacheSubnetGroupName: cache-private
+      Description: cache-private-sg
+      SubnetIds:
+        - !Ref SubnetPrivate
+
+  Cache:
+    Type: AWS::ElastiCache::ReplicationGroup
+    Properties:
+      AtRestEncryptionEnabled: false
+      CacheNodeType: cache.t2.micro
+      CacheSubnetGroupName: !Ref CacheSubnetGroup
+      Engine: redis
+      EngineVersion: 5.0.6
+      NumCacheClusters: 2
+      PreferredMaintenanceWindow: "tue:08:00-tue:09:00"
+      ReplicationGroupId: moji-chat-cache
+      ReplicationGroupDescription: Prod
+      SecurityGroupIds:
+        - sg-084199ab9beac7266
+
+Outputs:
+  CacheAddr:
+    Value: !GetAtt Cache.PrimaryEndPoint.Address
+    Export:
+      Name: MojiChatCacheAddr
