@@ -63,7 +63,7 @@ Resources:
     Properties:
       SubnetId: !Ref FrontendSubnet
       RouteTableId: !Ref FrontendRouteTable
-  
+
   SubnetPrivate:
     Type: AWS::EC2::Subnet
     Properties:
@@ -89,7 +89,7 @@ Resources:
         FromPort: '22'
         ToPort: '22'
         CidrIp: !Ref MyIP
-  
+
   CacheSubnetGroup:
     Type: AWS::ElastiCache::SubnetGroup
     Properties:
@@ -114,7 +114,16 @@ Resources:
         - sg-084199ab9beac7266
 
 Outputs:
-  CacheAddr:
-    Value: !GetAtt Cache.PrimaryEndPoint.Address
+  CacheEndPoint:
+    Value:
+      !Join
+        - ''
+        - - !GetAtt Cache.PrimaryEndPoint.Address
+          - ':'
+          - !GetAtt Cache.PrimaryEndPoint.Port
     Export:
-      Name: MojiChatCacheAddr
+      Name: MojiChatCacheEndPoint
+  PrivateSubnet:
+    Value: !Ref SubnetPrivate
+    Export:
+      Name: MojiChatVPC-SubnetPrivate
