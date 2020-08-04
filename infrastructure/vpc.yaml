@@ -1,10 +1,17 @@
 AWSTemplateFormatVersion: '2010-09-09'
 
 Parameters:
+  # SSH用キーペアの指定
+  KeyPair:
+    Description: KeyPair Name
+    Type: AWS::EC2::KeyPair::KeyName
   # SSHを許可するIP
   MyIP:
     Description: My IP
     Type:  String
+  AmiId:
+    Description: AMI ID
+    Type: AWS::EC2::Image::Id
 
 Resources:
   MojiChatVPC:
@@ -89,6 +96,19 @@ Resources:
         FromPort: '22'
         ToPort: '22'
         CidrIp: !Ref MyIP
+
+  Bastion:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: 't2.micro'
+      SecurityGroupIds:
+        - !GetAtt MojiChatSecurityGroup.GroupId
+      SubnetId: !Ref FrontendSubnet
+      ImageId: !Ref AmiId
+      KeyName: !Ref KeyPair
+      Tags:
+        - Key: Name
+          Value: Bastion
 
   CacheSubnetGroup:
     Type: AWS::ElastiCache::SubnetGroup
