@@ -1,48 +1,28 @@
 package main
 
 import (
-	"errors"
+    "errors"
 	"fmt"
-	"io/ioutil"
-	"net/http"
+    "os"
 
-	"github.com/aws/aws-lambda-go/events"
+    "github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
+    "github.com/soveran/redisurl"
 )
 
 var (
-	// DefaultHTTPGetAddress Default Address
-	DefaultHTTPGetAddress = "https://checkip.amazonaws.com"
-
-	// ErrNoIP No IP found in response
-	ErrNoIP = errors.New("No IP in HTTP response")
-
 	// ErrNon200Response non 200 status code in response
 	ErrNon200Response = errors.New("Non 200 Response found")
 )
 
-func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	resp, err := http.Get(DefaultHTTPGetAddress)
-	if err != nil {
-		return events.APIGatewayProxyResponse{}, err
-	}
+func handler(request events.APIGatewayWebsocketProxyRequest) (events.APIGatewayProxyResponse, error) {
+    cid := request.RequestContext.ConnectionID
+    var_dump(cid)
 
-	if resp.StatusCode != 200 {
-		return events.APIGatewayProxyResponse{}, ErrNon200Response
-	}
-
-	ip, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return events.APIGatewayProxyResponse{}, err
-	}
-    var_dump(resp.Body)
-
-	if len(ip) == 0 {
-		return events.APIGatewayProxyResponse{}, ErrNoIP
-	}
+	res := SaveUser(cid)
+	var_dump(res)
 
 	return events.APIGatewayProxyResponse{
-		Body:       fmt.Sprintf("Hello, %v", string(ip)),
 		StatusCode: 200,
 	}, nil
 }
@@ -55,4 +35,28 @@ func var_dump(v ...interface{}) {
     for _, vv := range(v) {
         fmt.Printf("%#v\n", vv)
     }
+}
+
+// SaveUser ユーザを保存する
+func SaveUser(cid string) interface{} {
+    ep := os.Getenv("CacheEndPoint")
+    conn, err := redisurl.ConnectToURL("telnet://" + ep)
+    if err != nil {
+        fmt.Println(err)
+        panic(err)
+    }
+
+    val, err := conn.Do("SET", "users", cid, "NX", "EX", "120")
+    if err != nil {
+        fmt.Println(err)
+        panic(err)
+    }
+
+    // 存在判定
+    if val == nil {
+        fmt.Println("既にオンラインです。")
+        panic(err)
+    }
+
+    return val
 }
