@@ -2,7 +2,7 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
   app
-  
+
   Sample SAM Template for app
 
 # More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
@@ -62,7 +62,13 @@ Resources:
       Tracing: Active # https://docs.aws.amazon.com/lambda/latest/dg/lambda-x-ray.html
       Environment: # More info about Env Vars: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#environment-object
         Variables:
-          PARAM1: VALUE
+          CacheEndPoint: !ImportValue MojiChatCacheEndPoint
+      VpcConfig:
+        SecurityGroupIds:
+          - !ImportValue DefaultSGId
+        SubnetIds:
+          - !ImportValue MojiChatVPC-SubnetPrivate
+
   OnConnectPermission:
     Type: AWS::Lambda::Permission
     DependsOn:
