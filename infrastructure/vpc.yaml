@@ -12,6 +12,11 @@ Parameters:
   AmiId:
     Description: AMI ID
     Type: AWS::EC2::Image::Id
+  # VPCのデフォルトSGのID
+  DefaultSGId:
+    Description: VPC DefaultSGId
+    Type:  String
+    Default: sg-084199ab9beac7266
 
 Resources:
   MojiChatVPC:
@@ -147,3 +152,7 @@ Outputs:
     Value: !Ref SubnetPrivate
     Export:
       Name: MojiChatVPC-SubnetPrivate
+  DefaultSGId:
+    Value: !Ref DefaultSGId
+    Export:
+      Name: DefaultSGId
